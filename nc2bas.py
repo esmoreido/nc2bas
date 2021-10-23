@@ -171,16 +171,17 @@ def ewembi2bas(path):
             df = ds[var].resample(time='D').mean().to_dataframe().reset_index()
             df[var] = df[var] - 272.15
         elif var == 'hurs':
-            dtd = ds[var].resample(time='D').mean().to_dataframe().reset_index()
-            # dtd[var] = dtd[var] - 272.15
-            # dt2 = ds['tas'].resample(time='D').mean().to_dataframe().reset_index()
-            # dt2['t2m'] = dt2['t2m'] - 272.15
+            dRH = ds[var].resample(time='D').mean().to_dataframe().reset_index()
+            ds_tas = xr.open_dataset(path.replace('hurs', 'tas'))
+            dt2 = ds_tas['tas'].resample(time='D').mean().to_dataframe().reset_index()
+            dt2['tas'] = dt2['tas'] - 272.15
             # # рассчитываем влажность насыщения и абсолютную
-            # dtd['ea'] = 6.112 * np.exp((17.67 * dtd[var]) / (dtd[var] + 243.5))
-            # dt2['es'] = 6.112 * np.exp((17.67 * dt2['t2m']) / (dt2['t2m'] + 243.5))
+            dt2['es'] = 6.112 * np.exp((17.67 * dt2['t2m']) / (dt2['t2m'] + 243.5))
+            dRH['ea'] = (dRH[var] * dt2['es']) / 100
             # # рассчитываем дефицит как разницу
-            # dtd[var] = dt2['es'] - dtd['ea']
-            # df = dtd[['time', 'latitude', 'longitude', var]]
+            dRH['def'] = dt2['es'] - dRH['ea']
+            df = dRH[['time', 'latitude', 'longitude', 'def']]
+            print(df.head())
 
         print(var)
         # stations = np.repeat(np.arange(len(coords)), len(ds.time.values) / 24)
@@ -234,8 +235,8 @@ def nc2bas_batch(path):
     else:
         print("Detected NetCDF files: \n", "\n".join(ff))
         for f in ff:
-            nc2bas(f)
-
+            # nc2bas(f)
+            ewembi2bas(f)
 
 # главный модуль
 if __name__ == "__main__":
