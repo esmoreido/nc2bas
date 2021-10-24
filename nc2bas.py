@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import xarray as xr
-import cdsapi
+# import cdsapi
 
 
 # недописано
@@ -149,7 +149,7 @@ def nc2bas(path):
 def ewembi2bas(path):
     print('Converting %s to *.bas' % path)
     ds = xr.open_dataset(path)
-    print(ds)
+    # print(ds)
 
     # пишем координаты
     # coords = np.array(np.meshgrid(ds.latitude.values, ds.longitude.values)).T.reshape(-1, 2)
@@ -176,53 +176,59 @@ def ewembi2bas(path):
             dt2 = ds_tas['tas'].resample(time='D').mean().to_dataframe().reset_index()
             dt2['tas'] = dt2['tas'] - 272.15
             # # рассчитываем влажность насыщения и абсолютную
-            dt2['es'] = 6.112 * np.exp((17.67 * dt2['t2m']) / (dt2['t2m'] + 243.5))
+            dt2['es'] = 6.112 * np.exp((17.67 * dt2['tas']) / (dt2['tas'] + 243.5))
             dRH['ea'] = (dRH[var] * dt2['es']) / 100
             # # рассчитываем дефицит как разницу
             dRH['def'] = dt2['es'] - dRH['ea']
-            df = dRH[['time', 'latitude', 'longitude', 'def']]
-            print(df.head())
+            df = dRH[['time', 'lat', 'lon', 'def']]
+            var = 'def'
+            # print(df.head())
 
         print(var)
         # stations = np.repeat(np.arange(len(coords)), len(ds.time.values) / 24)
-        stations = [x for x in range(len(coords))] * int(len(ds.time.values) / 24)
-        df['stations'] = stations
+        stations = [x for x in range(len(coords))] * int(len(ds.time.values))
+        df.loc[:, 'stations'] = stations
         df = df.pivot_table(index='time', columns='stations', values=var)
 
-        # делаем файл с правильным названием
-        if var == 'tp':  # обработка файлов с осадками
-            outfile = 'PRE' + str(df.index.min().year)[-2:] + '.bas'
-        elif var == 't2m':
-            outfile = 'TEMP' + str(df.index.min().year)[-2:] + '.bas'
-        elif var == 'd2m':
-            outfile = 'DEF' + str(df.index.min().year)[-2:] + '.bas'
+        # цикл по годам в данных
+        yrs = df.index.year.unique()
+        for yr in yrs:
+            out_df = df.loc[df.index.year == yr, :]
+            # print(out_df.head())
+            # делаем файл с правильным названием
+            if var == 'pr':  # обработка файлов с осадками
+                outfile = 'PRE' + str(yr)[-2:] + '.bas'
+            elif var == 'tas':
+                outfile = 'TEMP' + str(yr)[-2:] + '.bas'
+            elif var == 'def':
+                outfile = 'DEF' + str(yr)[-2:] + '.bas'
 
 
-        # пишем в файл
-        with open(outfile, 'w') as f:
+            # пишем в файл
+            with open(outfile, 'w') as f:
 
-            # пишем в него хэдер
-            if var == 'tp':
-                f.write(r'Precipitation, mm' + '\n')
-            elif var == 't2m':
-                f.write(r'Temperature, oC' + '\n')
-            elif var == 'd2m':
-                f.write(r'Deficit, hPa' + '\n')
-            # количество станций и дней в файле
-            f.write(str(len(df.columns)) + ' ' + str(len(df.index)) + '\n')
-            # номера всех станций
-            f.write(','.join([str(x) for x in df.columns.values]) + '\n')
-            # три
-            f.write('\n')
-            # пустых
-            f.write('\n')
-            # строки
-            f.write('\n')
-            # данные, причем в виде форматированной строки и заменяем в них запятую на пробел
-            cont = df.to_csv(na_rep=' -99.00', date_format='%Y%m%d', header=False, float_format='%7.2f')
-            cont = cont.replace(',', ' ')
-            f.write(cont)
-            f.close()
+                # пишем в него хэдер
+                if var == 'pr':
+                    f.write(r'Precipitation, mm' + '\n')
+                elif var == 'tas':
+                    f.write(r'Temperature, oC' + '\n')
+                elif var == 'def':
+                    f.write(r'Deficit, hPa' + '\n')
+                # количество станций и дней в файле
+                f.write(str(len(out_df.columns)) + ' ' + str(len(out_df.index)) + '\n')
+                # номера всех станций
+                f.write(','.join([str(x) for x in out_df.columns.values]) + '\n')
+                # три
+                f.write('\n')
+                # пустых
+                f.write('\n')
+                # строки
+                f.write('\n')
+                # данные, причем в виде форматированной строки и заменяем в них запятую на пробел
+                cont = out_df.to_csv(na_rep=' -99.00', date_format='%Y%m%d', header=False, float_format='%7.2f')
+                cont = cont.replace(',', ' ')
+                f.write(cont)
+                f.close()
 
     print('Done')
 
@@ -244,7 +250,7 @@ if __name__ == "__main__":
     # cds2nc(r'd:\EcoMeteo\ERA5\baikal', ['d2m'], range(1979, 2021))
 
     # конвертация данных
-    path = r'd:\EcoMeteo\ewembi2a_krym'
+    path = r'D:\YandexDisk\ИВПРАН\крым\данные\ewembi2a_krym'
     nc2bas_batch(path)
 
 
